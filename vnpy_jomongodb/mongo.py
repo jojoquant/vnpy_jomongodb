@@ -1,4 +1,6 @@
 from datetime import datetime
+
+import numpy as np
 import pandas as pd
 
 from vnpy_mongodb import Database
@@ -124,22 +126,22 @@ class JoMongodbDatabase(Database):
             }
         )
 
-    def get_end_date(self, symbol, exchange, interval) -> str:
+    def get_end_date(self, symbol, exchange, interval) -> np.datetime64:
         # sql = f'''select * from dbbardata
         #  where symbol='{symbol}' and exchange='{exchange}' and interval='{interval}'
         #  order by datetime desc limit 1;
         #  '''
 
         df = self.get_sorted_date_df(symbol, exchange, interval, ascend=False)
-        return df['datetime'].astype(str).values[0]
+        return df['datetime'].values[0]
 
-    def get_start_date(self, symbol, exchange, interval) -> str:
+    def get_start_date(self, symbol, exchange, interval) -> np.datetime64:
         #  sql = f'''select * from dbbardata
         #  where symbol='{symbol}' and exchange='{exchange}' and interval='{interval}'
         #  order by datetime asc limit 1;
         #  '''
         df = self.get_sorted_date_df(symbol, exchange, interval, ascend=True)
-        return df['datetime'].astype(str).values[0]
+        return df['datetime'].values[0]
 
     def get_sorted_date_df(self, symbol, exchange, interval, ascend=True, table: str = None) -> pd.DataFrame:
 
@@ -151,6 +153,7 @@ class JoMongodbDatabase(Database):
             {"symbol": symbol, "exchange": exchange, "interval": interval},
             {'_id': 0}
         )
+
         return pd.json_normalize(
             list(
                 collection.find(*query).sort([("datetime", ascend)]).limit(1)
