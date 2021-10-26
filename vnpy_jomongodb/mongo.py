@@ -83,23 +83,26 @@ class JoMongodbDatabase(Database):
 
         overview = self.overview_collection.find_one(overview_filter)
 
+        start_datetime = my_list[0]["datetime"].to_pydatetime()
+        end_datetime = my_list[-1]["datetime"].to_pydatetime()
+
         if not overview:
             overview = {
                 "symbol": my_list[0]["symbol"],
                 "exchange": my_list[0]["exchange"],
                 "interval": my_list[0]["interval"],
                 "count": len(my_list),
-                "start": my_list[0]["datetime"],
-                "end": my_list[-1]["datetime"]
+                "start": start_datetime,
+                "end": end_datetime
             }
         else:
-            overview["start"] = min(my_list[0]["datetime"], overview["start"])
-            overview["end"] = max(my_list[-1]["datetime"], overview["end"])
+            overview["start"] = min(start_datetime, overview["start"])
+            overview["end"] = max(end_datetime, overview["end"])
 
             # TODO 这里以后注意分表的时候, 数据量的更新问题
             overview["count"] = self.bar_collection.count_documents(overview_filter)
 
-        self.overview_collection.update_one(overview_filter, overview, upsert=True)
+        self.overview_collection.update_one(overview_filter, {"$set": overview}, upsert=True)
         return True
 
     def get_groupby_df(self, table: str = None) -> pd.DataFrame:
@@ -169,6 +172,7 @@ if __name__ == '__main__':
     end_date = dd.get_end_date(symbol, exchange, interval)
     grb_df = dd.get_groupby_df()
     df = dd.load_bar_df(symbol, exchange, interval)
-    # dd.save_bar_df(df)
+
+    dd.save_bar_df(df)
 
     print(1)
