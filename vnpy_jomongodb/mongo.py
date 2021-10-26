@@ -42,6 +42,9 @@ class JoMongodbDatabase(Database):
 
     def save_bar_df(self, df, table: str = None, callback=None):
         '''
+        df的datetime如果没有tzinfo, 为了统一, 最好设置一下,
+        例如: df['datetime'] = df['datetime'].tz_localize(DB_TZ)
+
         :param df:
         :param table: 可以指定新的表名, 进行分表存储, 替代默认的 "bar_data"
         :param callback: 用于回显当前存储进度
