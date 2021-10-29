@@ -5,6 +5,8 @@ import pandas as pd
 
 from vnpy_mongodb import Database
 
+from vnpy.trader.constant import Exchange, Interval
+
 
 class JoMongodbDatabase(Database):
 
@@ -17,28 +19,28 @@ class JoMongodbDatabase(Database):
 
     def load_bar_df(
             self,
-            symbol: str, exchange: str, interval: str,
-            start: datetime.date = None,
-            end: datetime.date = None,
+            symbol: str,
+            exchange: Exchange,
+            interval: Interval,
+            start: datetime = None,
+            end: datetime = None,
             table: str = None,
     ) -> pd.DataFrame:
 
-        datetime_start = {"$gte": datetime(start.year, start.month, start.day)} if start else {}
-        datetime_end = {"$lte": datetime(end.year, end.month, end.day)} if end else {"$lte": datetime.now()}
+        datetime_start = {"$gte": start} if start else {}
+        datetime_end = {"$lte": end} if end else {"$lte": datetime.now()}
 
         db = self.client[self.database]
         collection = db[table] if table is not None else db[self.bar_collection_name]
         query = (
             {
-                "symbol": symbol, "exchange": exchange, "interval": interval,
+                "symbol": symbol, "exchange": exchange.value, "interval": interval.value,
                 "datetime": {**datetime_start, **datetime_end}
             },
             {'_id': 0}
         )
 
-        df = pd.json_normalize(list(collection.find(*query)))
-
-        return df
+        return pd.json_normalize(list(collection.find(*query)))
 
     def save_bar_df(self, df, table: str = None, callback=None):
         '''
@@ -77,11 +79,15 @@ class JoMongodbDatabase(Database):
             if callback is not None:
                 callback(n_rows, start_i)
 
+        symbol = my_list[0]["symbol"]
+        exchange = my_list[0]["exchange"]
+        interval = my_list[0]["interval"]
+
         # 更新汇总
         overview_filter = {
-            "symbol": my_list[0]["symbol"],
-            "exchange": my_list[0]["exchange"],
-            "interval": my_list[0]["interval"]
+            "symbol": symbol,
+            "exchange": exchange,
+            "interval": interval
         }
 
         overview = self.overview_collection.find_one(overview_filter)
@@ -91,9 +97,9 @@ class JoMongodbDatabase(Database):
 
         if not overview:
             overview = {
-                "symbol": my_list[0]["symbol"],
-                "exchange": my_list[0]["exchange"],
-                "interval": my_list[0]["interval"],
+                "symbol": symbol,
+                "exchange": exchange,
+                "interval": interval,
                 "count": len(my_list),
                 "start": start_datetime,
                 "end": end_datetime
@@ -132,7 +138,7 @@ class JoMongodbDatabase(Database):
             }
         )
 
-    def get_end_date(self, symbol, exchange, interval) -> np.datetime64:
+    def get_end_date(self, symbol: str, exchange: Exchange, interval: Interval) -> np.datetime64:
         # sql = f'''select * from dbbardata
         #  where symbol='{symbol}' and exchange='{exchange}' and interval='{interval}'
         #  order by datetime desc limit 1;
@@ -141,7 +147,7 @@ class JoMongodbDatabase(Database):
         df = self.get_sorted_date_df(symbol, exchange, interval, ascend=False)
         return df['datetime'].values[0]
 
-    def get_start_date(self, symbol, exchange, interval) -> np.datetime64:
+    def get_start_date(self, symbol: str, exchange: Exchange, interval: Interval) -> np.datetime64:
         #  sql = f'''select * from dbbardata
         #  where symbol='{symbol}' and exchange='{exchange}' and interval='{interval}'
         #  order by datetime asc limit 1;
@@ -149,14 +155,15 @@ class JoMongodbDatabase(Database):
         df = self.get_sorted_date_df(symbol, exchange, interval, ascend=True)
         return df['datetime'].values[0]
 
-    def get_sorted_date_df(self, symbol, exchange, interval, ascend=True, table: str = None) -> pd.DataFrame:
+    def get_sorted_date_df(self, symbol: str, exchange: Exchange, interval: Interval, ascend=True,
+                           table: str = None) -> pd.DataFrame:
 
         ascend = 1 if ascend else -1
 
         db = self.client[self.database]
         collection = db[self.bar_collection_name] if table is None else db[table]
         query = (
-            {"symbol": symbol, "exchange": exchange, "interval": interval},
+            {"symbol": symbol, "exchange": exchange.value, "interval": interval.value},
             {'_id': 0}
         )
 
@@ -168,7 +175,7 @@ class JoMongodbDatabase(Database):
 
 
 if __name__ == '__main__':
-    symbol, exchange, interval = "ethbtc", "BINANCE", "d"
+    symbol, exchange, interval = "RBL8", Exchange.SHFE, Interval.MINUTE_5
     dd = JoMongodbDatabase()
 
     start_date = dd.get_start_date(symbol, exchange, interval)
@@ -176,6 +183,6 @@ if __name__ == '__main__':
     grb_df = dd.get_groupby_df()
     df = dd.load_bar_df(symbol, exchange, interval)
 
-    dd.save_bar_df(df)
+    # dd.save_bar_df(df)
 
     print(1)
