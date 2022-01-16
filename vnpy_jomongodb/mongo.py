@@ -1,10 +1,10 @@
-from datetime import datetime
-
 import numpy as np
 import pandas as pd
 
-from vnpy_mongodb import Database
+from datetime import datetime
+from typing import Union, List
 
+from vnpy_mongodb import Database
 from vnpy.trader.constant import Exchange, Interval
 
 
@@ -19,13 +19,20 @@ class JoMongodbDatabase(Database):
 
     def load_bar_df(
             self,
-            symbol: str,
-            exchange: Exchange,
-            interval: Interval,
+            symbol: Union[str, List[str]],
+            exchange: Union[Exchange, List[Exchange]],
+            interval: Union[Interval, List[Interval]],
             start: datetime = None,
             end: datetime = None,
             table: str = None,
     ) -> pd.DataFrame:
+        '''
+        symbol, exchange, interval = "128079", Exchange.SSE, Interval.MINUTE_5
+        symbol, exchange, interval = ["110038", "110043", "128079"], [Exchange.SSE, Exchange.SZSE], Interval.DAILY
+        symbol, exchange, interval = ["110038", "110043", "128079"], [Exchange.SSE, Exchange.SZSE], [Interval.DAILY, Interval.MINUTE_5]
+
+        df = dd.load_bar_df(symbol, exchange, interval)
+        '''
 
         datetime_start = {"$gte": start} if start else {}
         datetime_end = {"$lte": end} if end else {"$lte": datetime.now()}
@@ -34,7 +41,9 @@ class JoMongodbDatabase(Database):
         collection = db[table] if table is not None else db[self.bar_collection_name]
         query = (
             {
-                "symbol": symbol, "exchange": exchange.value, "interval": interval.value,
+                "symbol": symbol if isinstance(symbol, str) else {'$in': symbol},
+                "exchange": exchange.value if isinstance(exchange, Exchange) else {'$in': [e.value for e in exchange]},
+                "interval": interval.value if isinstance(interval, Interval) else {'$in': [i.value for i in interval]},
                 "datetime": {**datetime_start, **datetime_end}
             },
             {'_id': 0}
@@ -178,9 +187,14 @@ if __name__ == '__main__':
     symbol, exchange, interval = "RBL8", Exchange.SHFE, Interval.MINUTE_5
     dd = JoMongodbDatabase()
 
-    start_date = dd.get_start_date(symbol, exchange, interval)
-    end_date = dd.get_end_date(symbol, exchange, interval)
-    grb_df = dd.get_groupby_df()
+    # start_date = dd.get_start_date(symbol, exchange, interval)
+    # end_date = dd.get_end_date(symbol, exchange, interval)
+    # grb_df = dd.get_groupby_df()
+
+    symbol, exchange, interval = "128079", Exchange.SSE, Interval.MINUTE_5
+    symbol, exchange, interval = ["110038", "110043", "128079"], [Exchange.SSE, Exchange.SZSE], Interval.DAILY
+    symbol, exchange, interval = ["110038", "110043", "128079"], [Exchange.SSE, Exchange.SZSE], [Interval.DAILY,
+                                                                                                 Interval.MINUTE_5]
     df = dd.load_bar_df(symbol, exchange, interval)
 
     # dd.save_bar_df(df)
